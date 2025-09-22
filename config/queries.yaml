@@ -1,0 +1,2 @@
+# SQL queries for Air Quality Agent
+location_search: "select * from gis.search_location_json(:location_text)"
