@@ -1,71 +1,79 @@
-"""
-LocationResolverAgent
-Resolves location references (city, landmark, alias) to standardized IDs, coordinates, and bounding boxes.
-"""
-
-from typing import Dict, Any, List, Optional
+# src/agents/location_resolver.py
+import json
+from typing import Dict, Any, List
 from .agent_base import AgentBase
-import yaml
-import os
 
 class LocationResolverAgent(AgentBase):
-    def __init__(self, db_connection=None, queries_path=None):
+    def __init__(self, db_connection):
         super().__init__(name="LocationResolverAgent")
         self.db = db_connection
-        # Load queries from config/queries.yaml
-        if queries_path is None:
-            queries_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "config", "queries.yaml")
-        with open(queries_path, "r") as f:
-            self.queries = yaml.safe_load(f)
-
+    
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        input_data: { "location_query": str }
-        output: {
-            "resolved_locations": List[str],
-            "resolution_type": str,
-            "confidence": float,
-            "bbox": List[float]
-        }
+        Calls gis.search_location_json and returns all matches
         """
         query_text = input_data.get("location_query", "").strip()
-        self.log(f"Resolving location for query: '{query_text}'")
-
-        sql = self.queries.get("location_search")
-        if not sql:
-            return {
-                "success": False,
-                "error": "Location search query not found in config",
-                "resolved_locations": [],
-                "resolution_type": None,
-                "confidence": 0.0,
-                "bbox": []
-            }
+        self.log(f"Searching for location: '{query_text}'")
+        
         try:
-            # Use the database connection to execute the query
-            # Replace :location_text with parameterized value if needed
-            # Assuming db_connection.execute_query is async
+            # Call your search function
             result = await self.db.execute_query(
-                sql.replace(":location_text", "$1"), [query_text]
+                "SELECT gis.search_location_json($1) as locations", 
+                [query_text]
             )
-            if not result:
-                self.log("No match found for location query.")
+            
+            if not result or not result[0]['locations']:
                 return {
                     "success": False,
-                    "error": "Location not recognized",
-                    "resolved_locations": [],
-                    "resolution_type": None,
-                    "confidence": 0.0,
-                    "bbox": []
+                    "locations": [],
+                    "error": "No locations found"
                 }
-            # Assume result[0] contains the needed fields
-            row = result[0]
+            
+            # Parse JSON result
+            locations = result[0]['locations']
+            if isinstance(locations, str):
+                locations = json.loads(locations)
+            
+            # Format for disambiguation
+            formatted_locations = []
+            for loc in locations:
+                formatted_locations.append({
+                    "code": loc.get("code"),
+                    "level": loc.get("level"),
+                    "name": loc.get("name"),
+                    "display_name": self._format_display_name(loc),
+                    "state": loc.get("state_name"),
+                    "district": loc.get("district_name"),
+                    "parent": loc.get("parent_name")
+                })
+            
             return {
                 "success": True,
-                "resolved_locations": row.get("resolved_locations", []),
-                "resolution_type": row.get("resolution_type"),
-                "confidence": row.get("confidence", 1.0),
-                "bbox": row.get("bbox", [])
+                "locations": formatted_locations,
+                "count": len(formatted_locations),
+                "needs_disambiguation": len(formatted_locations) > 1
             }
+            
         except Exception as e:
             return self.handle_error(e, {"location_query": query_text})
+    
+    def _format_display_name(self, location: Dict) -> str:
+        """Create user-friendly display name"""
+        level = location.get('level', '')
+        name = location.get('name', '')
+        
+        level_display = {
+            'district': '📍 District',
+            'district_hq': '🏛️ City (District HQ)',
+            'sub_district': '📌 Sub-district',
+            'ward': '🏘️ Ward'
+        }.get(level, '📍 Location')
+        
+        parts = [f"{level_display}: {name}"]
+        
+        if location.get('district_name') and level != 'district':
+            parts.append(f"District: {location['district_name']}")
+        if location.get('state_name'):
+            parts.append(f"State: {location['state_name']}")
+            
+        return " | ".join(parts)
