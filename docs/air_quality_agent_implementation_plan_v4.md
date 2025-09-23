@@ -92,37 +92,37 @@ A production-ready Q&A agent system for Air Quality Monitoring using LangGraph o
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   User Interface Layer                   │
+│                   User Interface Layer                  │
 │                  (Streamlit Chat App)                   │
 └─────────────────────┬───────────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────────┐
-│                  Orchestration Layer                     │
-│                  (LangGraph Workflows)                   │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ • Query Parsing                                 │   │
-│  │ • Intent Classification                         │   │
-│  │ • Entity Extraction                            │   │
-│  │ • Disambiguation Handling                      │   │
-│  └─────────────────────────────────────────────────┘   │
+│                  Orchestration Layer                    │
+│                  (LangGraph Workflows)                  │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ • Query Parsing                                 │    │
+│  │ • Intent Classification                         │    │
+│  │ • Entity Extraction                             │    │
+│  │ • Disambiguation Handling                       │    │
+│  └─────────────────────────────────────────────────┘    │
 └─────────────────────┬───────────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────────┐
 │                    Agent Layer                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │Location  │  │PM Data   │  │Trend     │            │
-│  │Resolver  │  │Agent     │  │Agent     │  ...       │
-│  └──────────┘  └──────────┘  └──────────┘            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐               │
+│  │Location  │  │PM Data   │  │Trend     │               │
+│  │Resolver  │  │Agent     │  │Agent     │  ...          │
+│  └──────────┘  └──────────┘  └──────────┘               │
 └─────────────────────┬───────────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────────┐
-│                  Data Access Layer                       │
-│                (PostgreSQL Functions)                    │
+│                  Data Access Layer                      │
+│                (PostgreSQL Functions)                   │
 │  • gis.search_location_json()                           │
 │  • gis.get_current_pm25()                               │
 │  • gis.get_pm25_trend()                                 │
 │  • gis.compare_locations_pm25()                         │
-└──────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### Query Flow Diagram

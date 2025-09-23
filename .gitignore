@@ -2,3 +2,14 @@
 .aqagent/
 .aqagent/
 .pytest_cache/
+./scripts/
+./scr/__pycache__/
+./src/agents/__pycache__/
+./src/ui/__pycache__/
+./src/utils/__pycache__/
+__pycache__/
+.ipynb_checkpoints
+.vscode/
+.DS_Store
+.env
+.aqagent
