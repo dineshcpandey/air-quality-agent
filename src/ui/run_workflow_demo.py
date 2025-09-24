@@ -11,7 +11,7 @@ import sys
 
 import pathlib
 ROOT = pathlib.Path.cwd()
-SRC = str(ROOT / 'src')
+SRC = str(ROOT / '/src')
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 if str(ROOT) not in sys.path:

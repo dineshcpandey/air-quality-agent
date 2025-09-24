@@ -11,7 +11,6 @@ import time
 def get_backend_url():
     """Get backend URL with validation"""
     # Try streamlit secrets first
-    print("[DEBUG] Retrieving backend URL from configuration")
     try:
         url = st.secrets.get('backend_url', None)
         if url and not url.startswith(('http://localhost', 'http://127.0.0.1', 'http://0.0.0.0')):

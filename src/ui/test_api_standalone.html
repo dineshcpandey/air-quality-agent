@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality API Test - No Streamlit</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .location-btn {
+            background: #2196F3;
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            text-align: left;
+        }
+        .location-btn:hover {
+            background: #1976D2;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        h2 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌍 Air Quality API Test (Direct)</h1>
+    <p>This page tests the API directly without Streamlit to isolate the webhook issue.</p>
+    
+    <div>
+        <h2>Backend URL: <span id="backend-url">http://localhost:8001</span></h2>
+        
+        <button onclick="testHealth()">Test Backend Health</button>
+        <button onclick="testQuery()">Get Ambedkar Nagar Locations</button>
+        <button onclick="clearOutput()">Clear Output</button>
+    </div>
+    
+    <div id="locations-container" style="display: none;">
+        <h2>Select a Location:</h2>
+        <div id="locations-list"></div>
+    </div>
+    
+    <div id="output"></div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:8001';
+        let currentState = null;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            output.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function testHealth() {
+            log('Testing backend health...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                log(`✅ Backend is healthy: ${JSON.stringify(data)}`, 'success');
+            } catch (error) {
+                log(`❌ Backend health check failed: ${error}`, 'error');
+                log('Make sure backend is running: python -m uvicorn src.api.main:app --reload --port 8001', 'error');
+            }
+        }
+
+        async function testQuery() {
+            log('Fetching locations for Ambedkar Nagar...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: 'What is PM2.5 in Ambedkar Nagar'
+                    })
+                });
+                
+                log(`Response status: ${response.status}`);
+                const data = await response.json();
+                
+                currentState = data.state;
+                
+                if (currentState && currentState.waiting_for_user) {
+                    const locations = currentState.locations || [];
+                    log(`✅ Found ${locations.length} locations`, 'success');
+                    
+                    // Display location buttons
+                    displayLocations(locations);
+                } else {
+                    log('No disambiguation needed or error occurred');
+                    log(JSON.stringify(data, null, 2));
+                }
+            } catch (error) {
+                log(`❌ Query failed: ${error}`, 'error');
+            }
+        }
+
+        function displayLocations(locations) {
+            const container = document.getElementById('locations-container');
+            const list = document.getElementById('locations-list');
+            
+            list.innerHTML = '';
+            locations.forEach((loc, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'location-btn';
+                btn.innerHTML = `${idx}. ${loc.display_name || loc.name} (${loc.level})`;
+                btn.onclick = () => selectLocation(idx);
+                list.appendChild(btn);
+            });
+            
+            container.style.display = 'block';
+        }
+
+        async function selectLocation(index) {
+            log(`Selecting location at index ${index}...`);
+            log(`URL: ${BACKEND_URL}/query/select`);
+            
+            if (!currentState) {
+                log('❌ No state available', 'error');
+                return;
+            }
+            
+            try {
+                const payload = {
+                    state: currentState,
+                    selected_index: index
+                };
+                
+                log(`Sending selection request...`);
+                
+                const response = await fetch(`${BACKEND_URL}/query/select`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                log(`Response status: ${response.status}`);
+                
+                if (response.status === 200) {
+                    const data = await response.json();
+                    log('✅ Selection successful!', 'success');
+                    
+                    if (data.data && data.data.formatted_response) {
+                        log('PM2.5 Data:', 'success');
+                        log(data.data.formatted_response);
+                    }
+                    
+                    if (data.data && data.data.raw_data) {
+                        log('Raw data:');
+                        log(JSON.stringify(data.data.raw_data, null, 2));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Selection failed: ${response.status}`, 'error');
+                    log(errorText, 'error');
+                }
+            } catch (error) {
+                log(`❌ Selection request failed: ${error}`, 'error');
+                log('Check browser console for details', 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('locations-container').style.display = 'none';
+            currentState = null;
+            log('Output cleared');
+        }
+
+        // Test on load
+        window.onload = () => {
+            log('Page loaded. Testing backend connection...');
+            testHealth();
+        };
+    </script>
+</body>
+</html>

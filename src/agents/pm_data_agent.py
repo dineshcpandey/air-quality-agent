@@ -6,11 +6,13 @@ class PMDataAgent(AgentBase):
     def __init__(self, db_connection):
         super().__init__(name="PMDataAgent")
         self.db = db_connection
+        print("PMDataAgent initialized with DB connection")
     
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Fetch PM2.5 data using gis.get_current_pm25(code, level)
         """
+        print(f"PMDataAgent.run called with input: {input_data}")
         # Accept either separate code/level or a full location dict
         location = input_data.get("location")
         if location and isinstance(location, dict):
