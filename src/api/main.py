@@ -173,6 +173,7 @@ async def post_query(req: Request):
 async def post_query_selection(req: Request):
     """Accept a JSON body {"state": {...}, "selected_index": 0} and continue the workflow."""
     try:
+        print(f"\n[API] /query/select endpoint called")
         body = await req.json()
         state = body.get('state')
         selected_index = body.get('selected_index')

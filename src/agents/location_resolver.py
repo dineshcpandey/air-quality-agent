@@ -64,7 +64,7 @@ class LocationResolverAgent(AgentBase):
                     "state": loc.get("state_name", ""),
                     "district": loc.get("district_name", ""),
                     "parent": loc.get("parent_name", ""),
-                    "raw": loc  # Keep original data
+                   # "raw": loc  # Keep original data
                 }
                 formatted_locations.append(formatted_location)
                 

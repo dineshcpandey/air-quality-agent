@@ -6,6 +6,7 @@ import os
 import asyncio
 from typing import Any, Dict, List
 import time
+import traceback
 from pathlib import Path
 import sys
 
@@ -167,20 +168,122 @@ def select_backend_urllib(state: Dict[str, Any], selected_index: int) -> Dict[st
 # ============================================================================
 
 def select_backend(state: Dict[str, Any], selected_index: int) -> Dict[str, Any]:
-    """Route to appropriate bypass method"""
+
+    """Debug version of select_backend to trace execution"""
+    import requests
+    import json
+    import streamlit as st
+    import traceback
+    import sys 
     
-    st.sidebar.write(f"🔧 Using {BYPASS_METHOD} method")
+    print("\n" + "="*70)
+    print("🔍 SELECT_BACKEND CALLED - DETAILED TRACE")
+    print("="*70)
     
-    if BYPASS_METHOD == "CURL":
-        return select_backend_curl(state, selected_index)
-    elif BYPASS_METHOD == "DIRECT_WORKFLOW":
-        return select_backend_direct(state, selected_index)
-    elif BYPASS_METHOD == "SUBPROCESS_PYTHON":
-        return select_backend_subprocess(state, selected_index)
-    elif BYPASS_METHOD == "URLLIB":
-        return select_backend_urllib(state, selected_index)
-    else:
-        return {"error": "Unknown bypass method"}
+    # Log the call
+    print(f"✅ Function called at: {time.time()}")
+    print(f"📍 Selected index: {selected_index}")
+    print(f"📍 Number of locations: {len(state.get('locations', []))}")
+    
+    # Check BACKEND_URL
+    url = f"{BACKEND_URL}/query/select"
+    print(f"📍 Target URL: {url}")
+    
+    # Verify URL is correct
+    if 'webhook' in url.lower() or 'fivetran' in url.lower():
+        print(f"❌ ERROR: Webhook URL detected: {url}")
+        st.error(f"Webhook URL detected: {url}")
+        return {"error": f"Webhook URL: {url}"}
+    
+    if not url.startswith(('http://localhost', 'http://127.0.0.1')):
+        print(f"⚠️ WARNING: Non-local URL: {url}")
+    
+    # Show what we're sending
+    payload = {
+        "state": state,
+        "selected_index": selected_index
+    }
+    print(f"\n📤 Payload size: {len(json.dumps(payload))} bytes")
+    print(f"📤 Payload preview: {json.dumps(payload)[:200]}...")
+    
+    # Try multiple methods to make the request
+    print("\n🔄 Attempting HTTP POST...")
+    
+    # Method 1: Standard requests
+    print("\n1️⃣ Trying requests.post()...")
+    try:
+        print(f"   Calling: requests.post('{url}', ...)")
+        response = requests.post(url, json=payload, timeout=10)
+        print(f"   ✅ Response status: {response.status_code}")
+        print(f"   ✅ Response URL: {response.url}")
+        
+        if response.url != url:
+            print(f"   ⚠️ REDIRECT DETECTED! Original: {url}, Final: {response.url}")
+            
+        result = response.json()
+        print(f"   ✅ Got response: {json.dumps(result)[:100]}...")
+        return result
+        
+    except Exception as e:
+        print(f"   ❌ requests.post failed: {type(e).__name__}: {e}")
+        print(f"   Stack trace:")
+        traceback.print_exc()
+    
+    # Method 2: Try urllib as fallback
+    print("\n2️⃣ Trying urllib as fallback...")
+    try:
+        import urllib.request
+        
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        
+        print(f"   Calling: urllib.request.urlopen('{url}', ...)")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result_text = response.read().decode('utf-8')
+            print(f"   ✅ urllib successful!")
+            result = json.loads(result_text)
+            print(f"   ✅ Got response: {json.dumps(result)[:100]}...")
+            return result
+            
+    except Exception as e:
+        print(f"   ❌ urllib failed: {type(e).__name__}: {e}")
+    
+    # Method 3: Try curl as last resort
+    print("\n3️⃣ Trying curl as last resort...")
+    try:
+        import subprocess
+        
+        cmd = [
+            'curl', '-X', 'POST', url,
+            '-H', 'Content-Type: application/json',
+            '-d', json.dumps(payload),
+            '-s'
+        ]
+        
+        print(f"   Running: curl -X POST {url} ...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            print(f"   ✅ curl successful!")
+            response_data = json.loads(result.stdout)
+            print(f"   ✅ Got response: {json.dumps(response_data)[:100]}...")
+            return response_data
+        else:
+            print(f"   ❌ curl failed with code {result.returncode}")
+            print(f"   stderr: {result.stderr}")
+            
+    except Exception as e:
+        print(f"   ❌ curl failed: {type(e).__name__}: {e}")
+    
+    # All methods failed
+    print("\n❌ ALL METHODS FAILED TO REACH BACKEND")
+    print("="*70)
+    
+    return {"error": "Could not reach backend with any method"}
+
+
+
 
 def query_backend(query_text: str) -> Dict[str, Any]:
     """Query backend - try multiple methods if needed"""
